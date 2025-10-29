@@ -113,6 +113,32 @@ TaskA ----> TaskB ----> TaskD
   3. 遍历所有后继 `node->_successors[i]`：
      - `--(successor->_dependents)` 减少依赖计数。
      - 若计数归零，则 `_schedule(*successor)`，表示可以执行后继任务。
+  
+```
+对  A.precede(B);         
+   A.precede(C);    
+   B.precede(D);         
+   C.precede(D); 
+分析 
+• 在 example/simple.cpp:12-24 中，silent_emplace 返回的 A/B/C/D 是 tf::Task 句柄，它们内部都握有一个
+  Node*，后续的 precede 调用只是在构建任务图而不会立即执行任务。
+
+  - A.precede(B) (example/simple.cpp:19) 落到可变参模板 Task::precede(Ts&&…) (taskflow/graph/
+    task.hpp:205)，其中的折叠表达式会调用一次 A._node->precede(*B._node)，把 B 作为 A 的后继。
+  - Node::precede (taskflow/graph/graph.hpp:97) 负责真正修改图结构：把目标节点指针推入调用者的
+    _successors 向量，并将目标节点的 _dependents 计数原子加一。这意味着 B 需要等待一个前驱完成。
+  - A.precede(C) (example/simple.cpp:20) 重复同样的流程，使得 C 也成为 A 的后继，因此 C 的
+    _dependents 变为 1。
+  - B.precede(D) 与 C.precede(D) (example/simple.cpp:21-22) 先后让 D 被登记为 B、C 的后继，所以 D 的
+    _dependents 累加到 2，只有在两个前驱都执行完后才会被调度。
+  - 这些 precede 调用都返回对原任务的引用，因此可以链式书写；但在这个示例里每个调用都单独写出，最终
+    形成注释所示的菱形依赖图。
+
+  等依赖关系全部写好后，tf.wait_for_all() 会启动调度器：只有 _dependents 计数为 0 的节点会先入队执行
+  （此例中先执行 A），前驱完成时调度器会把对应后继的 _dependents 减一，直到某节点的计数降到 0 才会真
+  正运行，从而保证输出顺序满足所有 precede 约束。若还想继续深入，可以看调度器如何在任务完成时对这些
+  计数做 fetch_sub。
+```
 
 ### 4.2 示例的执行顺序
 

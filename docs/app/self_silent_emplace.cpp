@@ -89,10 +89,19 @@ public:
     避免不必要的拷贝
     */
 
-    template <typename... C, std::enable_if_t<(sizeof...(C)>1), void>*>
-    auto silent_emplace(C&&... cs) {
-        return std::make_tuple(silent_emplace(std::forward<C>(cs))...);
-    }
+    template <typename... C, std::enable_if_t<(sizeof...(C)>1), void>* = nullptr>
+    auto silent_emplace(C&&... callables);
+
+    //template <typename... C, std::enable_if_t<(sizeof...(C)>1), void>*>
+    //auto silent_emplace(C&&... cs) {
+    //    return std::make_tuple(silent_emplace(std::forward<C>(cs))...);
+    //}
+
+    // 使用默认模板参数
+    //template <typename... C, typename std::enable_if_t<(sizeof...(C) > 1), bool> = true>
+    //auto silent_emplace(C&&... callables) {
+    //    return std::make_tuple(silent_emplace(std::forward<C>(callables))...);
+    //}
     
     void execute() {
         SubflowBuilder subflow;
@@ -107,6 +116,11 @@ public:
         }
     }
 };
+
+template <typename... C, std::enable_if_t<(sizeof...(C)>1), void>*>
+auto FlowBuilder::silent_emplace(C&&... cs) {
+  return std::make_tuple(silent_emplace(std::forward<C>(cs))...);
+}
 
 // 测试示例
 int main() {
@@ -145,7 +159,8 @@ int main() {
     std::cout << "\n=== 测试多参数版本（静态任务） ===\n";
     FlowBuilder builder1;
     // 多参数静态任务
-    auto [taskA, taskB, taskC] = builder1.silent_emplace(
+    //auto [taskA, taskB, taskC] = 
+    builder1.silent_emplace(
         []() { std::cout << "Multi-static task A\n"; },
         []() { std::cout << "Multi-static task B\n"; },
         []() { std::cout << "Multi-static task C\n"; }
@@ -153,7 +168,8 @@ int main() {
 
     std::cout << "\n=== 测试多参数版本（动态任务） ===\n";
     // 多参数动态任务
-    auto [dynamic1, dynamic2] = builder1.silent_emplace(
+    //auto [dynamic1, dynamic2] = 
+    builder1.silent_emplace(
         [](SubflowBuilder& sub) {
             std::cout << "Dynamic task 1\n";
             sub.emplace([]() { std::cout << "Dynamic1 sub-task\n"; });
@@ -167,7 +183,8 @@ int main() {
 
     std::cout << "\n=== 测试多参数版本（混合任务） ===\n";
     // 混合任务
-    auto [static1, dynamic3, static2] = builder1.silent_emplace(
+    //auto [static1, dynamic3, static2] = 
+    builder1.silent_emplace(
         []() { std::cout << "Static between dynamics\n"; },
         [](SubflowBuilder& sub) {
             std::cout << "Mixed dynamic task\n";
@@ -178,7 +195,8 @@ int main() {
     
     std::cout << "\n=== 测试边界情况：两个任务 ===\n";
     // 刚好两个任务的情况
-    auto [taskX, taskY] = builder1.silent_emplace(
+    //auto [taskX, taskY] =
+    builder1.silent_emplace(
         []() { std::cout << "Task X\n"; },
         []() { std::cout << "Task Y\n"; }
     );
