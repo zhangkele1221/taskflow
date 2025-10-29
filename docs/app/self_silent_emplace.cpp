@@ -21,7 +21,7 @@ public:
     std::function<void(SubflowBuilder&)> func;
     
     template<typename F>
-    Node(F&& f) : func(std::forward<F>(f)) {}
+    Node(F&& f) : func(std::forward<F>(f)) {std::cout<<" new Node "<<std::endl;}
     
     void execute(SubflowBuilder& subflow) {
         func(subflow);
@@ -33,7 +33,7 @@ class Task {
 public:
     Node* node;
     
-    Task(Node& n) : node(&n) {}
+    Task(Node& n) : node(&n) {std::cout<<" new task "<<std::endl;}
 };
 
 // 流构建器
@@ -112,6 +112,7 @@ int main() {
     });
     */
     
+    std::cout << "beging  execute!\n";
     // 执行所有任务
     builder.execute();
     
