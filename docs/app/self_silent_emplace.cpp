@@ -107,11 +107,11 @@ int main() {
     });
     
     // 另一个静态任务
-    /*
+    
     builder.silent_emplace([]() {
         std::cout << "Another static task!\n";
     });
-    */
+    
     
     std::cout << "beging  execute!\n";
     // 执行所有任务
