@@ -156,7 +156,7 @@ class BasicTaskflow : public FlowBuilder {
 
   private:
     
-    Graph _graph;//保存用户构建的任务节点
+    Graph _graph;//保存用户构建的任务节点 std::list<Node>;
 
     std::shared_ptr<Executor> _executor;//线程池执行器负责调度任务
 
@@ -270,7 +270,7 @@ void BasicTaskflow<E>::Closure::operator () () const {
 // Constructor
 template <template <typename...> typename E>
 BasicTaskflow<E>::BasicTaskflow() : 
-  FlowBuilder {_graph},
+  FlowBuilder {_graph},//std::list<Node>;
   _executor {std::make_shared<Executor>(std::thread::hardware_concurrency())} {
 }
 

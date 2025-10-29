@@ -295,7 +295,7 @@ class WorkStealingThreadpool {
     
   struct Worker {
     std::condition_variable cv;
-    WorkStealingQueue<Closure> queue;
+    WorkStealingQueue<Closure> queue;// 每个 worker 准备一个 WorkStealingQueue<Closure>（以及线程池级别的 _queue），这些队列在无参构造时会隐式使用默认实参 4096 作为容量上限
     std::optional<Closure> cache;
     bool exit  {false};
     bool ready {false};
