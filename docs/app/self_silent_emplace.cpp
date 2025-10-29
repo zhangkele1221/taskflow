@@ -71,6 +71,28 @@ public:
             static_assert(std::is_invocable_v<C>, "invalid task work type");
         }
     }
+
+    /*
+    sizeof...(C)获取参数包的大小
+    std::enable_if_t<condition, void>当条件为true时有效
+    只有当参数个数>1时，这个模板才会被启用
+
+    return std::make_tuple(silent_emplace(std::forward<C>(callables))...);
+
+    (silent_emplace(std::forward<C>(callables))...对每个参数展开调用
+    std::make_tuple(...)将所有结果打包成tuple
+    使用结构化绑定 auto [taskA, taskB, taskC]来接收
+
+    std::forward<C>(callables)...
+
+    保持每个callable的值类别（左值/右值）
+    避免不必要的拷贝
+    */
+
+    template <typename... C, std::enable_if_t<(sizeof...(C)>1), void>*>
+    auto silent_emplace(C&&... cs) {
+        return std::make_tuple(silent_emplace(std::forward<C>(cs))...);
+    }
     
     void execute() {
         SubflowBuilder subflow;
@@ -115,7 +137,56 @@ int main() {
     
     std::cout << "beging  execute!\n";
     // 执行所有任务
-    builder.execute();
+   builder.execute();
+
+
+    std::cout << "\n======================\n";
+
+    std::cout << "\n=== 测试多参数版本（静态任务） ===\n";
+    FlowBuilder builder1;
+    // 多参数静态任务
+    auto [taskA, taskB, taskC] = builder1.silent_emplace(
+        []() { std::cout << "Multi-static task A\n"; },
+        []() { std::cout << "Multi-static task B\n"; },
+        []() { std::cout << "Multi-static task C\n"; }
+    );
+
+    std::cout << "\n=== 测试多参数版本（动态任务） ===\n";
+    // 多参数动态任务
+    auto [dynamic1, dynamic2] = builder1.silent_emplace(
+        [](SubflowBuilder& sub) {
+            std::cout << "Dynamic task 1\n";
+            sub.emplace([]() { std::cout << "Dynamic1 sub-task\n"; });
+        },
+        [](SubflowBuilder& sub) {
+            std::cout << "Dynamic task 2\n";
+            sub.emplace([]() { std::cout << "Dynamic2 sub-task\n"; });
+        }
+    );
+
+
+    std::cout << "\n=== 测试多参数版本（混合任务） ===\n";
+    // 混合任务
+    auto [static1, dynamic3, static2] = builder1.silent_emplace(
+        []() { std::cout << "Static between dynamics\n"; },
+        [](SubflowBuilder& sub) {
+            std::cout << "Mixed dynamic task\n";
+            sub.emplace([]() { std::cout << "Mixed sub-task\n"; });
+        },
+        []() { std::cout << "Final static task\n"; }
+    );
+    
+    std::cout << "\n=== 测试边界情况：两个任务 ===\n";
+    // 刚好两个任务的情况
+    auto [taskX, taskY] = builder1.silent_emplace(
+        []() { std::cout << "Task X\n"; },
+        []() { std::cout << "Task Y\n"; }
+    );
+    
+    std::cout << "\n=== 开始执行所有任务 ===\n";
+    // 执行所有任务
+    builder1.execute();
+
     
     return 0;
 }
