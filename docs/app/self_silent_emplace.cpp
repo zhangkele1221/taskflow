@@ -76,7 +76,7 @@ public:
         SubflowBuilder subflow;
         for (auto& node : _graph) {
             node.execute(subflow);
-            std::cout << "执行 一个主任务.. \n";
+            std::cout << "执行 一个主任务结束 \n";
         }
         
         // 执行子任务
@@ -96,7 +96,6 @@ int main() {
     });
     
     // 动态任务示例（可接收SubflowBuilder参数）
-    /*
     builder.silent_emplace([](SubflowBuilder& sub) {
         std::cout << "Dynamic task adding sub-tasks...\n";
         sub.emplace([]() {
@@ -108,6 +107,7 @@ int main() {
     });
     
     // 另一个静态任务
+    /*
     builder.silent_emplace([]() {
         std::cout << "Another static task!\n";
     });
