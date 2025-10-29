@@ -48,6 +48,12 @@ TaskA ----> TaskB ----> TaskD
 - `tf::FlowBuilder::silent_emplace` 定义见 `taskflow/graph/flow_builder.hpp:854-870`：
   - 对于静态任务（普通 lambda），直接在 `_graph` 末尾 `emplace_back` 一个 `Node`，其 `_work` 存储该 lambda。
   - 返回 `tf::Task` 句柄（`taskflow/graph/task.hpp:180-199`），封装对节点的访问。
+- 调用链具体顺序如下：
+  1. `tf::Taskflow` 继承自 `FlowBuilder`（`taskflow/graph/basic_taskflow.hpp:18-41`），因此 `tf.silent_emplace` 直接分派到 `FlowBuilder::silent_emplace`。
+  2. 模板函数先用 `std::is_invocable_v<C, SubflowBuilder&>` 判定是否为动态任务；本示例为静态 lambda，命中 `std::is_invocable_v<C>` 分支。
+  3. `_graph.emplace_back(std::forward<C>(c))` 构造新的 `Node`，调用 `Node::Node(C&&)` 将 lambda 放入 `_work`（`taskflow/graph/graph.hpp:40-112`），同时初始化依赖计数与拓扑指针。
+  4. 返回 `Task` 对象包裹该节点指针，为后续 `precede` 等操作提供句柄（`taskflow/graph/task.hpp:180-243`）。
+  5. 若调用了可变参数版本（`silent_emplace(C&&... callables)`），则通过递归展开将每个 functor 依次执行上述 1-4 步骤，并最终打包成 `std::tuple<Task...>` 返回（`taskflow/graph/flow_builder.hpp:322-326`）。
 
 四个 lambda 的行为：
 
