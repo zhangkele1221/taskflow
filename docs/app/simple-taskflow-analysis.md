@@ -33,6 +33,7 @@ TaskA ----> TaskB ----> TaskD
        - `WorkStealingThreadpool` 构造函数会立刻调用 `_spawn(N)` 创建 `N` 个工作线程（`taskflow/threadpool/workstealing_threadpool.hpp:308-369`），每个线程维护一个本地队列并具备窃取能力，支持后续的 `_executor->emplace` 和 `_executor->batch` 调度请求。
        - 若硬件并发数返回 0，C++ 标准允许返回 0 表示未知，此时线程池仍会按 0 初始化；实际运行时通常提供非零值，如需固定线程数可改用带 `N` 参数的构造。
     4. `_topologies` 默认初始化为空的 `std::forward_list<Topology>`，用于保存 dispatch 后的拓扑及其 future。
+  - 默认 `WorkStealingThreadpool` 会为每个 worker 准备一个 `WorkStealingQueue<Closure>`（以及线程池级别的 `_queue`），这些队列在无参构造时会隐式使用默认实参 `4096` 作为容量上限（`taskflow/threadpool/workstealing_threadpool.hpp:168-220`）。构造函数将 `_top`、`_bottom` 设为 0，分配长度 4096 的循环数组，并预留 `_garbage` 容器空间，确保后续 push/resize 操作线程安全且高效。
   - 额外的构造重载：
     - `BasicTaskflow(unsigned N)`：显式指定线程池大小（`taskflow/graph/basic_taskflow.hpp:278-282`），仍会经过步骤 1、2、4，只是将 `N` 传给执行器。
     - `BasicTaskflow(std::shared_ptr<Executor> e)`：重用外部提供的执行器（`taskflow/graph/basic_taskflow.hpp:284-294`），用于多个 Taskflow 共享线程池；若传入空指针会抛出 `tf::Error`。
