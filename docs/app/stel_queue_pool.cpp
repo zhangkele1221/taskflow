@@ -433,7 +433,7 @@ unsigned WorkStealingThreadpool<Closure>::_fast_modulo(unsigned x, unsigned N) c
 }
 
 // Procedure: _spawn
-template <typename Closure>
+template <typename Closure>//负责创建工作线程并实现工作窃取算法
 void WorkStealingThreadpool<Closure>::_spawn(unsigned N) {
   
   // Lock to synchronize all workers before creating _worker_mapss
@@ -442,57 +442,73 @@ void WorkStealingThreadpool<Closure>::_spawn(unsigned N) {
   for(unsigned i=0; i<N; ++i) {
     _threads.emplace_back([this, i, N] () -> void {
 
-      std::optional<Closure> t;
-      Worker& w = (_workers[i]);
-      w.last_victim = (i + 1) % N;
-      w.seed = i + 1;
-
+      std::optional<Closure> t;// 当前任务
+      Worker& w = (_workers[i]);// 当前工作线程
+      w.last_victim = (i + 1) % N;// 初始化窃取目标（避免自窃取）
+      w.seed = i + 1;// 线程特定的随机种子
+      
+      // 延迟加锁的unique_lock（提高性能）
       std::unique_lock lock(_mutex, std::defer_lock);
-
+      
+      // 主工作循环
       while(!w.exit) {
         
-        // pop from my own queue
+        // === 阶段1：获取任务 ===
+        // pop from my own queue // 策略1：优先从本地队列获取（LIFO，缓存友好）
         if(t = w.queue.pop(); !t) {
-          // steal from others
+          // steal from others  // 策略2：本地队列空，尝试窃取其他线程任务（FIFO）
           t = _steal(i);
         }
         
         // no tasks
-        if(!t) {
-          if(lock.try_lock()) {  // avoid contention
-            if(_queue.empty()) {
-              w.ready = false;
+        // === 阶段2：处理无任务情况 ===
+        // 如果上述策略都失败，进入等待状态    其实就是没有任务 自己没有任务和steal也没有获取到任务
+        if(!t) {// 无任务
+          if(lock.try_lock()) {  // avoid contention  // 非阻塞尝试获取锁，避免锁竞争
+            if(_queue.empty()) {  // 检查全局队列（需要锁保护）
+              w.ready = false;    // 标记为空闲，加入空闲队列
               _idlers.push_back(&w);
-              while(!w.ready && !w.exit) {
+
+              while(!w.ready && !w.exit) { // 等待新任务或终止信号
                 w.cv.wait(lock);
               }
+
             }
-            lock.unlock();
+            lock.unlock(); // 释放锁，让其他线程可以修改空闲队列
           }
 
-          if(w.cache) {
-            std::swap(t, w.cache);
+          if(w.cache) {// 检查是否被分配了缓存任务
+            std::swap(t, w.cache);// 获取缓存任务
           }
         }
-
+        
+        // === 阶段3：执行任务 ===
+        // 执行当前任务和可能的缓存任务（DFS优化）
         while(t) {
-          (*t)();
+          
+          (*t)();     // 执行任务
+
+          // 检查是否有新的缓存任务（DFS策略）
           if(w.cache) {
             t = std::move(w.cache);
             w.cache = std::nullopt;
           }
           else {
-            t = std::nullopt;
+            t = std::nullopt;// 准备获取下一个任务
           }
+
         }
 
         // balance load
+        // === 阶段4：负载均衡 ===
+        // 执行完任务后检查是否需要负载均衡
         _balance_load(i);
 
       } // End of while ------------------------------------------------------ 
 
     });     
-
+    
+    // 记录线程ID到工作线程索引的映射
     _worker_maps.insert({_threads.back().get_id(), i});
   }
 }
