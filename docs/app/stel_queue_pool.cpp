@@ -12,8 +12,6 @@
 // 2018/12/03 - created by Tsung-Wei Huang
 //   - added WorkStealingQueue class
 
-#pragma once
-
 #include <iostream>
 #include <vector>
 #include <cstdlib>
@@ -27,9 +25,8 @@
 #include <algorithm>
 #include <set>
 #include <numeric>
-
+#include <unordered_map>
 #include <chrono>
-
 #include <future>
 #include <random>
 
@@ -38,7 +35,7 @@
 
 //using namespace tf;
 using namespace std;
-using namespace std::chrono_literals;
+//using namespace std::chrono_literals;
 
 
 namespace tf {
@@ -687,7 +684,7 @@ void test_basic_functionality() {
     std::cout << "=== 测试1：基本功能测试 ===" << std::endl;
     
     // 创建4个工作线程的线程池
-    WorkStealingThreadpool<std::function<void()>> pool(4);
+    tf::WorkStealingThreadpool<std::function<void()>> pool(4);
     
     std::atomic<int> counter{0};
     std::atomic<int> completed{0};
@@ -705,7 +702,7 @@ void test_basic_functionality() {
     
     // 等待所有任务完成
     while (completed.load() < 10) {
-        std::this_thread::sleep_for(100);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));  // 正确：指定毫秒
     }
     
     std::cout << "最终计数: " << counter.load() << std::endl;
@@ -716,7 +713,7 @@ void test_basic_functionality() {
 void test_work_stealing() {
     std::cout << "=== 测试2：工作窃取机制测试 ===" << std::endl;
     
-    WorkStealingThreadpool<std::function<void()>> pool(4);
+    tf::WorkStealingThreadpool<std::function<void()>> pool(4);
     std::atomic<int> task_count{0};
     
     // 模拟不均匀的任务分布
@@ -734,7 +731,7 @@ void test_work_stealing() {
     
     // 等待所有任务完成
     while (task_count.load() < 50) {
-        std::this_thread::sleep_for(50);
+        std::this_thread::sleep_for(50ms);
         std::cout << "已完成任务: " << task_count.load() << "/50\r" << std::flush;
     }
     
@@ -745,7 +742,7 @@ void test_work_stealing() {
 void test_batch_submission() {
     std::cout << "=== 测试3：批量任务提交测试 ===" << std::endl;
     
-    WorkStealingThreadpool<std::function<void()>> pool(4);
+    tf::WorkStealingThreadpool<std::function<void()>> pool(4);
     std::atomic<int> completed{0};
     
     // 创建批量任务
@@ -763,7 +760,7 @@ void test_batch_submission() {
     
     // 等待完成
     while (completed.load() < 20) {
-        std::this_thread::sleep_for(100);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));  // 正确：指定毫秒
     }
     
     std::cout << "批量提交测试完成\n\n";
@@ -779,7 +776,7 @@ void test_performance_comparison() {
     // 测试1：使用工作窃取线程池
     auto start1 = std::chrono::high_resolution_clock::now();
     {
-        WorkStealingThreadpool<std::function<void()>> pool(4);
+        tf::WorkStealingThreadpool<std::function<void()>> pool(4);
         std::atomic<int> counter{0};
         
         for (int i = 0; i < NUM_TASKS; ++i) {
@@ -836,7 +833,7 @@ void test_performance_comparison() {
 void test_load_balancing() {
     std::cout << "=== 测试5：负载均衡测试 ===" << std::endl;
     
-    WorkStealingThreadpool<std::function<void()>> pool(4);
+    tf::WorkStealingThreadpool<std::function<void()>> pool(4);
     std::vector<std::atomic<int>> thread_task_count(4);
     
     // 初始化原子计数器
@@ -865,7 +862,7 @@ void test_load_balancing() {
     
     // 等待完成
     while (completed.load() < NUM_TASKS) {
-        std::this_thread::sleep_for(50);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));  // 正确：指定毫秒
     }
     
     std::cout << "负载均衡测试完成（任务复杂度随机分布）\n\n";
@@ -875,7 +872,7 @@ void test_load_balancing() {
 void test_exception_handling() {
     std::cout << "=== 测试6：异常处理测试 ===" << std::endl;
     
-    WorkStealingThreadpool<std::function<void()>> pool(2);
+    tf::WorkStealingThreadpool<std::function<void()>> pool(2);
     std::atomic<int> normal_tasks{0};
     std::atomic<int> exception_tasks{0};
     
@@ -917,7 +914,7 @@ void test_zero_workers() {
     std::cout << "=== 测试7：零工作线程测试 ===" << std::endl;
     
     // 创建0个工作线程的线程池（任务在当前线程执行）
-    WorkStealingThreadpool<std::function<void()> > pool(0);
+    tf::WorkStealingThreadpool<std::function<void()> > pool(0);
     
     std::atomic<int> counter{0};
     
@@ -940,7 +937,7 @@ void test_memory_usage() {
     auto start_mem = std::chrono::high_resolution_clock::now();
     
     {
-        WorkStealingThreadpool<std::function<void()>> pool(4);
+        tf::WorkStealingThreadpool<std::function<void()>> pool(4);
         std::atomic<int> counter{0};
         
         // 提交大量小任务测试内存管理
